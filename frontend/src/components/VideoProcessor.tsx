@@ -7,7 +7,7 @@ import { DetectionBox, BackendResponse } from '../types';
 interface VideoProcessorProps {
   onDataReceived: (data: BackendResponse) => void;
   isActive: boolean;
-  videoSource: 'camera' | 'upload';
+  videoSource: 'camera' | 'upload' | 'remote';
   uploadedVideoUrl?: string;
 }
 
@@ -17,20 +17,33 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [remoteFrame, setRemoteFrame] = useState<string | null>(null);
+  
+  const isActiveRef = useRef(isActive);
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
   // Initialize WebSocket
   useEffect(() => {
     const connect = () => {
-      const ws = new WebSocket('ws://localhost:8000/ws/stream');
+      const host = window.location.hostname;
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const role = videoSource === 'remote' ? 'viewer' : 'local';
+      const ws = new WebSocket(`${protocol}//${host}:8000/ws/stream?role=${role}`);
 
       ws.onopen = () => {
         setIsConnected(true);
       };
 
       ws.onmessage = (event) => {
+        if (!isActiveRef.current) return;
         const data = JSON.parse(event.data);
         onDataReceived(data);
         drawBoxes(data.detections);
+        if (data.frame) {
+          setRemoteFrame(data.frame);
+        }
       };
 
       ws.onclose = () => {
@@ -51,12 +64,12 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
     return () => {
       wsRef.current?.close();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoSource]); // Re-connect if source changes to/from remote
 
   // Frame processing loop
   useEffect(() => {
-    if (!isActive || !isConnected) return;
+    if (!isActive || !isConnected || videoSource === 'remote') return;
 
     const sendFrame = () => {
       if (wsRef.current?.readyState !== WebSocket.OPEN) return;
@@ -147,6 +160,22 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
           className="absolute inset-0 w-full h-full object-cover"
           videoConstraints={{ facingMode: 'user' }}
           onUserMediaError={() => console.warn('Camera access denied')}
+        />
+      )}
+
+      {/* Remote Camera Frame */}
+      {videoSource === 'remote' && remoteFrame && (
+        <img
+          src={remoteFrame}
+          alt="Remote Stream"
+          className="absolute inset-0 w-full h-full object-cover"
+          onLoad={(e) => {
+            const img = e.target as HTMLImageElement;
+            if (canvasRef.current && (canvasRef.current.width !== img.naturalWidth)) {
+              canvasRef.current.width = img.naturalWidth;
+              canvasRef.current.height = img.naturalHeight;
+            }
+          }}
         />
       )}
 

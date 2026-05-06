@@ -5,9 +5,10 @@ import { PhoneCall, AlertOctagon, X } from 'lucide-react';
 
 interface AlertSystemProps {
   isIncidentActive: boolean;
+  isActive?: boolean;
 }
 
-export default function AlertSystem({ isIncidentActive }: AlertSystemProps) {
+export default function AlertSystem({ isIncidentActive, isActive = true }: AlertSystemProps) {
   const [sirenActive, setSirenActive] = useState(false);
   const [showEmergencyBtn, setShowEmergencyBtn] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -39,7 +40,7 @@ export default function AlertSystem({ isIncidentActive }: AlertSystemProps) {
       oscRef.current = osc;
 
       // Loop siren
-      sirenLoopRef.current = setTimeout(() => { try { osc.stop(); } catch {} playSiren(); }, 1000);
+      sirenLoopRef.current = setTimeout(() => { try { osc.stop(); } catch { } playSiren(); }, 1000);
     } catch { /* ignore */ }
   };
 
@@ -48,11 +49,23 @@ export default function AlertSystem({ isIncidentActive }: AlertSystemProps) {
       clearTimeout(sirenLoopRef.current);
       sirenLoopRef.current = null;
     }
-    try { oscRef.current?.stop(); } catch {}
-    try { audioCtxRef.current?.close(); } catch {}
+    try { oscRef.current?.stop(); } catch { }
+    try { audioCtxRef.current?.close(); } catch { }
   };
 
   useEffect(() => {
+    if (isActive === false) {
+      setSirenActive(false);
+      setShowEmergencyBtn(false);
+      setDismissed(false);
+      stopSiren();
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+      return;
+    }
+
     if (sirenActive) return; // If already ringing, stay ringing until user dismisses
 
     if (isIncidentActive && !dismissed) {
@@ -73,8 +86,8 @@ export default function AlertSystem({ isIncidentActive }: AlertSystemProps) {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isIncidentActive, dismissed, sirenActive]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isIncidentActive, dismissed, sirenActive, isActive]);
 
   const handleStopAlert = () => {
     setSirenActive(false);
@@ -86,7 +99,7 @@ export default function AlertSystem({ isIncidentActive }: AlertSystemProps) {
     setSirenActive(false);
     setShowEmergencyBtn(false);
     stopSiren();
-    
+
     // Allow new alarms to trigger after a 15-second cooldown
     setTimeout(() => {
       setDismissed(false);
@@ -94,17 +107,17 @@ export default function AlertSystem({ isIncidentActive }: AlertSystemProps) {
   };
 
   const handleCallEmergency = () => {
-    alert('🚨 Initiating emergency services contact... (Simulated)');
+    alert('Initiating emergency services contact... (Simulated)');
   };
 
   if (!sirenActive && !showEmergencyBtn) return null;
 
   return (
     <div className="fixed inset-x-0 bottom-32 z-50 flex flex-col items-center gap-3 pointer-events-none">
-        <div className="pointer-events-auto relative flex items-center gap-4 bg-red-600/90 backdrop-blur-xl border border-red-400/60 shadow-[0_0_60px_rgba(220,38,38,0.6)] px-8 py-4 rounded-2xl animate-pulse">
-          <AlertOctagon className="w-7 h-7 text-white" />
-          <span className="text-white font-bold tracking-widest uppercase text-lg">⚠ Drowning Detected</span>
-        </div>
+      <div className="pointer-events-auto relative flex items-center gap-4 bg-red-600/90 backdrop-blur-xl border border-red-400/60 shadow-[0_0_60px_rgba(220,38,38,0.6)] px-8 py-4 rounded-2xl animate-pulse">
+        <AlertOctagon className="w-7 h-7 text-white" />
+        <span className="text-white font-bold tracking-widest uppercase text-lg">⚠ Drowning Detected</span>
+      </div>
 
       {showEmergencyBtn && (
         <div className="pointer-events-auto flex items-center gap-4 mt-2">
@@ -126,7 +139,7 @@ export default function AlertSystem({ isIncidentActive }: AlertSystemProps) {
               <X className="w-5 h-5" />
             </button>
           </div>
-          
+
           {sirenActive && (
             <button
               onClick={handleStopAlert}

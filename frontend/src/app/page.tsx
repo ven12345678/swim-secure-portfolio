@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import VideoProcessor from '../components/VideoProcessor';
 import AlertSystem from '../components/AlertSystem';
 import { BackendResponse, DetectionBox } from '../types';
@@ -20,7 +20,18 @@ import {
   Camera,
   FileVideo,
   X,
+  Smartphone,
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from 'recharts';
 
 // ─── Incident type ────────────────────────────────────────────────────────────
 interface Incident {
@@ -51,7 +62,7 @@ const riskBg = (r: number) =>
 export default function Home() {
   // ── playback state ──────────────────────────────────────────────────────────
   const [isActive, setIsActive] = useState(false);
-  const [videoSource, setVideoSource] = useState<'camera' | 'upload'>('camera');
+  const [videoSource, setVideoSource] = useState<'camera' | 'upload' | 'remote'>('camera');
   const [uploadedVideoUrl, setUploadedVideoUrl] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,7 +79,23 @@ export default function Home() {
 
   // ── UI state ────────────────────────────────────────────────────────────────
   const [showRiskLog, setShowRiskLog] = useState(true);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [remoteUrl, setRemoteUrl] = useState('');
   const [detections, setDetections] = useState<DetectionBox[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    const protocol = window.location.protocol; // 'https:' or 'http:'
+    fetch(`${protocol}//localhost:8000/local-ip`)
+      .then(r => r.json())
+      .then(data => {
+        setRemoteUrl(`${protocol}//${data.ip}:3000/camera`);
+      })
+      .catch(() => {
+        setRemoteUrl(`${window.location.origin}/camera`);
+      });
+  }, []);
 
   // ── data handler ────────────────────────────────────────────────────────────
   const handleDataReceived = useCallback((data: BackendResponse) => {
@@ -130,6 +157,101 @@ export default function Home() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const renderRiskGraph = () => {
+    if (!isMounted || riskLog.length === 0) return (
+      <div className="p-6 bg-slate-50 border-b border-slate-100 h-48 flex items-center justify-center">
+        <p className="text-slate-400 animate-pulse text-sm">Initializing graph...</p>
+      </div>
+    );
+
+    // We want chronologically from left to right, so we reverse
+    const data = [...riskLog].reverse();
+
+    return (
+      <div className="p-6 bg-slate-50 border-b border-slate-100">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+            <Activity className="w-4 h-4 text-blue-500" />
+            Live Risk Trend (Last 60s)
+          </p>
+          <div className="flex gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-blue-500" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Safe</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-orange-500" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Caution</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-red-500" />
+              <span className="text-[10px] text-slate-400 font-bold uppercase">Danger</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-40 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorRisk" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+              <XAxis
+                dataKey="time"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                minTickGap={30}
+              />
+              <YAxis
+                domain={[0, 100]}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: '#94a3b8' }}
+                ticks={[0, 25, 50, 75, 100]}
+              />
+              <Tooltip
+                contentStyle={{
+                  borderRadius: '12px',
+                  border: 'none',
+                  boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+                  padding: '8px 12px',
+                  fontSize: '12px'
+                }}
+                labelStyle={{ fontWeight: 'bold', marginBottom: '4px', color: '#64748b' }}
+                itemStyle={{ color: '#3b82f6', fontWeight: 'bold' }}
+                formatter={(value: number) => [`${value}%`, 'Risk Level']}
+                labelFormatter={(label) => `Time: ${label}`}
+              />
+              <Area
+                type="monotone"
+                dataKey="risk"
+                stroke="#3b82f6"
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#colorRisk)"
+                animationDuration={1000}
+                dot={(props: any) => {
+                  const { cx, cy, payload } = props;
+                  if (payload.risk < 40) return null;
+                  const color = payload.risk >= 70 ? '#ef4444' : '#f97316';
+                  return (
+                    <circle key={`dot-${payload.time}`} cx={cx} cy={cy} r={3} fill={color} stroke="white" strokeWidth={1.5} />
+                  );
+                }}
+                activeDot={{ r: 6, strokeWidth: 0 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       <section className="relative w-full h-screen overflow-hidden bg-black text-white">
@@ -176,17 +298,58 @@ export default function Home() {
         {!isActive && (
           <div className="absolute inset-0 z-25 flex items-center justify-center bg-black/50 backdrop-blur-sm">
             <div className="text-center space-y-5 flex flex-col items-center">
-              <button
-                id="start-btn"
-                onClick={() => setIsActive(true)}
-                className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all shadow-[0_0_30px_rgba(0,0,0,0.5)] border bg-green-600 border-green-500 text-white hover:bg-green-500 hover:scale-105 active:scale-95"
-              >
-                <Play className="w-6 h-6 fill-current" /> Start
-              </button>
-              <div>
-                <p className="text-neutral-300 text-lg font-medium">Press Start to begin live detection</p>
-                <p className="text-neutral-400 text-md mt-1">Camera will activate automatically</p>
+              <div className="flex gap-4">
+                <button
+                  id="start-btn"
+                  onClick={() => { setVideoSource('camera'); setIsActive(true); }}
+                  className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all shadow-[0_0_30px_rgba(0,0,0,0.5)] border bg-green-600 border-green-500 text-white hover:bg-green-500 hover:scale-105 active:scale-95"
+                >
+                  <Play className="w-6 h-6 fill-current" /> Local Camera
+                </button>
+                <button
+                  onClick={() => setShowQRModal(true)}
+                  className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all shadow-[0_0_30px_rgba(0,0,0,0.5)] border bg-blue-600 border-blue-500 text-white hover:bg-blue-500 hover:scale-105 active:scale-95"
+                >
+                  <Smartphone className="w-6 h-6" /> Remote Camera
+                </button>
               </div>
+              <div>
+                <p className="text-neutral-300 text-lg font-medium">Select a camera source to begin live detection</p>
+                <p className="text-neutral-400 text-md mt-1">Dashboard supports local webcam, remote phones, or CCTV</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* QR Code Modal */}
+        {showQRModal && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md">
+            <div className="bg-white text-slate-900 p-8 rounded-3xl max-w-sm w-full flex flex-col items-center shadow-2xl relative">
+              <button
+                onClick={() => setShowQRModal(false)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <Smartphone className="w-10 h-10 text-blue-600 mb-4" />
+              <h3 className="text-xl font-bold mb-2">Connect Remote Camera</h3>
+              <p className="text-center text-sm text-slate-500 mb-6 leading-relaxed">
+                Scan this QR code with your phone to use its camera as the live stream for this dashboard.
+              </p>
+              <div className="p-4 bg-white border-2 border-slate-100 rounded-2xl shadow-sm mb-6">
+                <QRCodeSVG value={remoteUrl} size={200} />
+              </div>
+              <button
+                onClick={() => {
+                  setShowQRModal(false);
+                  setVideoSource('remote');
+                  setIsActive(true);
+                }}
+                className="w-full bg-black hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95"
+              >
+                Wait for Connection
+              </button>
+              <p className="text-xs text-slate-400 mt-4 font-mono">{remoteUrl}</p>
             </div>
           </div>
         )}
@@ -233,17 +396,40 @@ export default function Home() {
       </section>
 
       {/* Alert overlay */}
-      <AlertSystem isIncidentActive={isIncidentActive} />
+      <AlertSystem isIncidentActive={isIncidentActive} isActive={isActive} />
 
       <section className="max-w-5xl mx-auto px-6 py-16 space-y-14">
+
+        {/* ── Recent Risk Log Table & Graph ── */}
+        <div>
+          <h2 className="text-2xl font-bold mb-5 flex items-center gap-2">Recent Risk Readings</h2>
+          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+            {renderRiskGraph()}
+            <div className="grid grid-cols-3 text-xs font-bold uppercase tracking-widest text-slate-500 px-6 py-3 border-b border-slate-100 bg-slate-50">
+              <span>Time</span><span>Risk Level</span><span>Persons</span>
+            </div>
+            {riskLog.length === 0 ? (
+              <p className="text-slate-500 text-sm text-center py-8">No readings yet.</p>
+            ) : (
+              <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
+                {riskLog.slice(0, 30).map((entry, i) => (
+                  <div key={i} className="grid grid-cols-3 px-6 py-3 text-sm hover:bg-slate-50 transition-colors">
+                    <span className="text-slate-500 font-mono text-xs">{entry.time}</span>
+                    <span className={`font-bold ${riskColorLight(entry.risk)}`}>{entry.risk}%</span>
+                    <span className="text-slate-700 font-medium">{entry.persons}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* ── Session Summary ── */}
         <div>
           <h2 className="text-2xl font-bold mb-5 flex items-center gap-2">Session Summary</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 ">
             {[
               { label: 'Incidents Detected', value: incidentLog.length, color: 'border-blue-200 bg-blue-50' },
-              { label: 'Current Persons', value: totalPersons, color: 'border-blue-200 bg-blue-50' },
               { label: 'Peak Risk', value: `${Math.round(currentMaxRisk)}%`, color: 'border-blue-200 bg-blue-50' },
               { label: 'Last Incident', value: incidentLog[0]?.time ?? '—', color: 'border-blue-200 bg-blue-50' },
             ].map((s, i) => (
@@ -289,29 +475,6 @@ export default function Home() {
               ))}
             </div>
           )}
-        </div>
-
-        {/* ── Recent Risk Log Table ── */}
-        <div>
-          <h2 className="text-2xl font-bold mb-5 flex items-center gap-2">Recent Risk Readings</h2>
-          <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-            <div className="grid grid-cols-3 text-xs font-bold uppercase tracking-widest text-slate-500 px-6 py-3 border-b border-slate-100 bg-slate-50">
-              <span>Time</span><span>Risk Level</span><span>Persons</span>
-            </div>
-            {riskLog.length === 0 ? (
-              <p className="text-slate-500 text-sm text-center py-8">No readings yet.</p>
-            ) : (
-              <div className="divide-y divide-slate-100 max-h-64 overflow-y-auto">
-                {riskLog.slice(0, 30).map((entry, i) => (
-                  <div key={i} className="grid grid-cols-3 px-6 py-3 text-sm hover:bg-slate-50 transition-colors">
-                    <span className="text-slate-500 font-mono text-xs">{entry.time}</span>
-                    <span className={`font-bold ${riskColorLight(entry.risk)}`}>{entry.risk}%</span>
-                    <span className="text-slate-700 font-medium">{entry.persons}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* ── Video Upload Analysis ── */}

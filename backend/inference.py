@@ -9,6 +9,7 @@ try:
     client = InferenceHTTPClient(
         api_url="https://serverless.roboflow.com",
         api_key="woYKWHifrhaQWTvmiIrg"
+        # api_key="T6vApHIxtSXyRpuOPgXI"
     )
 except Exception as e:
     client = None
@@ -41,6 +42,8 @@ def run_yolo_detection(base64_image: str):
         result = client.run_workflow(
             workspace_name="project-v8ej1",
             workflow_id="detect-count-and-visualize-3",
+    #         workspace_name="cheeses-workspace-ry9v5",
+    # workflow_id="detect-count-and-visualize",
             images={"image": frame},
             use_cache=True
         )
