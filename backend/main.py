@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from inference import run_yolo_detection, get_lstm_drowning_risk
 from tracker import PersonTracker
 import time
+from inference import cleanup_person, person_buffers
 
 app = FastAPI()
 
@@ -18,7 +19,7 @@ app.add_middleware(
 )
 
 # Global tracker (in a real app, instantiate per session/camera)
-tracker = PersonTracker(max_history=30) # Keep last 30 frames for LSTM
+tracker = PersonTracker(max_history=30, max_distance=800, max_missed=10)
 
 @app.get("/local-ip")
 async def get_local_ip():
@@ -91,7 +92,10 @@ async def websocket_endpoint(websocket: WebSocket, role: str = "local"):
                 for obj in tracked_objects:
                     person_id = obj["id"]
                     track_history = tracker.tracks[person_id]
-                    risk_score = get_lstm_drowning_risk(track_history)
+                    risk_score = get_lstm_drowning_risk(track_history, person_id)
+
+                    print(f"Track history sample: {track_history[-1] if track_history else 'empty'}")
+                    print(f"Track history length: {len(track_history)}")
                     
                     results.append({
                         "id": person_id,
@@ -99,8 +103,14 @@ async def websocket_endpoint(websocket: WebSocket, role: str = "local"):
                         "class": obj["class"],
                         "confidence": obj["confidence"],
                         "drowning_risk": risk_score,
-                        "is_drowning": risk_score > 70
+                        "is_drowning": risk_score > 50
                     })
+
+                # Cleanup buffers for persons no longer tracked
+                active_ids = {obj["id"] for obj in tracked_objects}
+                for pid in list(person_buffers.keys()):
+                    if pid not in active_ids:
+                        cleanup_person(pid)
                 
                 # 4. Send aggregated results back
                 response = {
