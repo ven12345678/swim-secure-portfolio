@@ -26,6 +26,9 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
 
   // Initialize WebSocket
   useEffect(() => {
+    let isMounted = true;
+    let reconnectTimeout: NodeJS.Timeout;
+
     const connect = () => {
       const host = window.location.hostname;
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -33,11 +36,12 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
       const ws = new WebSocket(`${protocol}//${host}:8000/ws/stream?role=${role}`);
 
       ws.onopen = () => {
+        if (!isMounted) { ws.close(); return; }
         setIsConnected(true);
       };
 
       ws.onmessage = (event) => {
-        if (!isActiveRef.current) return;
+        if (!isActiveRef.current || !isMounted) return;
         const data = JSON.parse(event.data);
         onDataReceived(data);
         drawBoxes(data.detections);
@@ -47,9 +51,10 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
       };
 
       ws.onclose = () => {
+        if (!isMounted) return; // Prevent reconnect loop if component unmounted
         setIsConnected(false);
         // Try to reconnect after 2s
-        setTimeout(connect, 2000);
+        reconnectTimeout = setTimeout(connect, 2000);
       };
 
       ws.onerror = () => {
@@ -62,6 +67,8 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
     connect();
 
     return () => {
+      isMounted = false;
+      clearTimeout(reconnectTimeout);
       wsRef.current?.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

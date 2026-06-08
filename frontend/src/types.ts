@@ -8,8 +8,10 @@ export interface DetectionBox {
 }
 
 export interface BackendResponse {
+  session_id?: number;
   timestamp: number;
   detections: DetectionBox[];
   total_persons: number;
   incident_active: boolean;
+  latency_ms?: number;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import VideoProcessor from '../components/VideoProcessor';
 import AlertSystem from '../components/AlertSystem';
 import { BackendResponse, DetectionBox } from '../types';
@@ -21,6 +22,11 @@ import {
   FileVideo,
   X,
   Smartphone,
+  History,
+  CheckCircle2,
+  XCircle,
+  Gauge,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
@@ -40,6 +46,7 @@ interface Incident {
   maxRisk: number;
   personsDetected: number;
   duration: string; // "~Xs"
+  feedback?: 'confirmed' | 'false_alarm'; // user verdict
 }
 
 // ─── Risk log entry ───────────────────────────────────────────────────────────
@@ -75,6 +82,8 @@ export default function Home() {
   const [riskLog, setRiskLog] = useState<RiskEntry[]>([]);
   const incidentCounterRef = useRef(0);
   const incidentStartRef = useRef<number | null>(null);
+  const peakIncidentRiskRef = useRef<number>(0);
+  const peakPersonsRef = useRef<number>(0);
   const lastIncidentStateRef = useRef(false);
 
   // ── UI state ────────────────────────────────────────────────────────────────
@@ -83,6 +92,10 @@ export default function Home() {
   const [remoteUrl, setRemoteUrl] = useState('');
   const [detections, setDetections] = useState<DetectionBox[]>([]);
   const [isMounted, setIsMounted] = useState(false);
+  const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  const [alertThreshold, setAlertThreshold] = useState(50); // % (matches backend default 0.50)
+  const [showThresholdSlider, setShowThresholdSlider] = useState(false);
+  const currentSessionIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -95,12 +108,24 @@ export default function Home() {
       .catch(() => {
         setRemoteUrl(`${window.location.origin}/camera`);
       });
+    // Fetch the current backend config and sync slider
+    fetch(`${window.location.protocol}//localhost:8000/config`)
+      .then(r => r.json())
+      .then(cfg => {
+        if (cfg.alert_threshold) setAlertThreshold(Math.round(cfg.alert_threshold * 100));
+      })
+      .catch(() => {});
   }, []);
 
   // ── data handler ────────────────────────────────────────────────────────────
   const handleDataReceived = useCallback((data: BackendResponse) => {
     setTotalPersons(data.total_persons);
     setDetections(data.detections);
+    if (data.latency_ms !== undefined) setLatencyMs(data.latency_ms);
+
+    if (data.session_id !== undefined) {
+      currentSessionIdRef.current = data.session_id;
+    }
 
     let maxRisk = 0;
     data.detections.forEach((d) => { if (d.drowning_risk > maxRisk) maxRisk = d.drowning_risk; });
@@ -118,23 +143,39 @@ export default function Home() {
 
     // Incident tracking
     const nowActive = data.incident_active;
-    if (nowActive && !lastIncidentStateRef.current) {
-      incidentStartRef.current = Date.now();
+    if (nowActive) {
+      if (!lastIncidentStateRef.current) {
+        incidentStartRef.current = Date.now();
+        peakIncidentRiskRef.current = maxRisk;
+        peakPersonsRef.current = data.total_persons;
+        console.log("[Incident Start] Max Risk:", maxRisk);
+      } else {
+        peakIncidentRiskRef.current = Math.max(peakIncidentRiskRef.current, maxRisk);
+        peakPersonsRef.current = Math.max(peakPersonsRef.current, data.total_persons);
+        console.log("[Incident Active] Current Max Risk:", maxRisk, "Peak:", peakIncidentRiskRef.current);
+      }
     }
     if (!nowActive && lastIncidentStateRef.current && incidentStartRef.current !== null) {
       const durSec = Math.round((Date.now() - incidentStartRef.current) / 1000);
       incidentCounterRef.current += 1;
+      
+      const loggedPeakRisk = Math.round(peakIncidentRiskRef.current);
+      const loggedPeakPersons = peakPersonsRef.current;
+      console.log("[Incident End] Logged Peak Risk:", loggedPeakRisk, "Persons:", loggedPeakPersons);
+      
       setIncidentLog((prev) => [
         {
           id: incidentCounterRef.current,
           time: new Date().toLocaleTimeString(),
-          maxRisk: Math.round(maxRisk),
-          personsDetected: data.total_persons,
+          maxRisk: loggedPeakRisk,
+          personsDetected: loggedPeakPersons,
           duration: `~${durSec}s`,
         },
         ...prev,
       ]);
       incidentStartRef.current = null;
+      peakIncidentRiskRef.current = 0;
+      peakPersonsRef.current = 0;
     }
     lastIncidentStateRef.current = nowActive;
     setIsIncidentActive(nowActive);
@@ -224,7 +265,7 @@ export default function Home() {
                 }}
                 labelStyle={{ fontWeight: 'bold', marginBottom: '4px', color: '#64748b' }}
                 itemStyle={{ color: '#3b82f6', fontWeight: 'bold' }}
-                formatter={(value: number) => [`${value}%`, 'Risk Level']}
+                formatter={(value: any) => [`${value}%`, 'Risk Level']}
                 labelFormatter={(label) => `Time: ${label}`}
               />
               <Area
@@ -256,13 +297,23 @@ export default function Home() {
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans">
       <section className="relative w-full h-screen overflow-hidden bg-black text-white">
 
+        {/* Background Image when Idle */}
+        {!isActive && (
+          <div
+            className="absolute inset-0 bg-cover bg-center z-10 opacity-100"
+            style={{ backgroundImage: "url('/background.png')" }}
+          />
+        )}
+
         {/* Live feed */}
-        <VideoProcessor
-          onDataReceived={handleDataReceived}
-          isActive={isActive}
-          videoSource={videoSource}
-          uploadedVideoUrl={uploadedVideoUrl ?? undefined}
-        />
+        {isActive && (
+          <VideoProcessor
+            onDataReceived={handleDataReceived}
+            isActive={isActive}
+            videoSource={videoSource}
+            uploadedVideoUrl={uploadedVideoUrl ?? undefined}
+          />
+        )}
 
         {/* ── Top-left: branding ── */}
         <div className="absolute top-5 left-6 z-30 flex items-center gap-3">
@@ -270,20 +321,36 @@ export default function Home() {
             <Waves className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className={`text-base font-bold leading-tight tracking-tight ${isActive ? 'text-black' : 'text-white'}`}>SwimSecure</h1>
-            <p className={`text-[12px] tracking-widest ${isActive ? 'text-neutral-700' : 'text-neutral-300'}`}>Real Time Drowning Detection</p>
+            <h1 className={`text-base font-bold leading-tight tracking-tight text-black`}>SwimSecure</h1>
+            <p className={`text-[12px] tracking-widest text-black`}>Real Time Drowning Detection</p>
           </div>
         </div>
 
-        {/* ── Top-right: person count ── */}
-        <div className="absolute top-5 right-6 z-30 flex items-center gap-2 bg-neutral-900/70 backdrop-blur-md border border-neutral-700/60 px-4 py-2 rounded-full">
-          <span className="text-xs text-neutral-300">Person in pool: </span>
-          <span className="text-sm font-bold text-white">{totalPersons}</span>
+        {/* ── Top-right: latency + person count + history link ── */}
+        <div className="absolute top-5 right-6 z-30 flex items-center gap-2">
+          {isActive && latencyMs !== null && (
+            <div className="flex items-center gap-1.5 bg-neutral-900/70 backdrop-blur-md border border-neutral-700/60 px-3 py-2 rounded-xl">
+              <Gauge className="w-3.5 h-3.5 text-blue-400" />
+              <span className={`text-xs font-bold font-mono ${
+                latencyMs > 500 ? 'text-red-400' : latencyMs > 200 ? 'text-yellow-400' : 'text-green-400'
+              }`}>{latencyMs}ms</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 bg-neutral-900/70 backdrop-blur-md border border-neutral-700/60 px-4 py-2 rounded-xl">
+            <span className="text-xs text-neutral-300">Person in pool: </span>
+            <span className="text-sm font-bold text-white">{totalPersons}</span>
+          </div>
+          <Link
+            href="/history"
+            className="flex items-center gap-1.5 bg-neutral-900/70 backdrop-blur-md border border-neutral-700/60 px-3 py-2 rounded-xl text-xs font-semibold text-neutral-200 hover:bg-[white] hover:text-black transition-all"
+          >
+            <History className="w-3.5 h-3.5" /> History
+          </Link>
         </div>
 
-        {/* ── Top-center: Stop button (only shown when active) ── */}
+        {/* ── Top-center: Stop + Threshold slider toggle ── */}
         {isActive && (
-          <div className="absolute top-5 left-1/2 -translate-x-1/2 z-30">
+          <div className="absolute top-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2">
             <button
               id="stop-btn"
               onClick={() => setIsActive(false)}
@@ -291,31 +358,68 @@ export default function Home() {
             >
               <Square className="w-4 h-4 fill-current" /> Stop
             </button>
+            <button
+              onClick={() => setShowThresholdSlider(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-full font-bold text-sm transition-all shadow-xl border bg-neutral-900/70 border-neutral-700/60 text-neutral-200 hover:bg-white hover:text-black active:scale-95"
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
+        {/* Threshold slider popover */}
+        {isActive && showThresholdSlider && (
+          <div className="absolute top-20 left-1/2 -translate-x-1/2 z-40 bg-neutral-900/90 backdrop-blur-xl border border-neutral-700 rounded-2xl px-6 py-4 w-72 shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-neutral-300">Alert Threshold</p>
+              <span className="text-sm font-bold font-mono text-white">{alertThreshold}%</span>
+            </div>
+            <input
+              type="range" min={10} max={90} step={5}
+              value={alertThreshold}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                setAlertThreshold(val);
+              }}
+              onMouseUp={(e) => {
+                const val = Number((e.target as HTMLInputElement).value);
+                fetch(`${window.location.protocol}//localhost:8000/config`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ alert_threshold: val / 100 }),
+                }).catch(() => {});
+              }}
+              className="w-full accent-blue-500"
+            />
+            <div className="flex justify-between text-[10px] text-neutral-500 mt-1">
+              <span>Sensitive (10%)</span><span>Strict (90%)</span>
+            </div>
+            <p className="text-[10px] text-neutral-500 mt-2 text-center">Drowning alert fires when risk exceeds this value</p>
           </div>
         )}
 
         {/* ── Idle overlay ── */}
         {!isActive && (
-          <div className="absolute inset-0 z-25 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="absolute inset-0 z-25 flex items-center justify-center bg-slate-900/20 backdrop-blur-md">
             <div className="text-center space-y-5 flex flex-col items-center">
               <div className="flex gap-4">
                 <button
                   id="start-btn"
                   onClick={() => { setVideoSource('camera'); setIsActive(true); }}
-                  className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all shadow-[0_0_30px_rgba(0,0,0,0.5)] border bg-green-600 border-green-500 text-white hover:bg-green-500 hover:scale-105 active:scale-95"
+                  className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all duration-300 shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-[black] bg-[black] text-slate-200 hover:bg-white hover:border-white hover:text-black hover:scale-105 active:scale-95"
                 >
                   <Play className="w-6 h-6 fill-current" /> Local Camera
                 </button>
                 <button
                   onClick={() => setShowQRModal(true)}
-                  className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all shadow-[0_0_30px_rgba(0,0,0,0.5)] border bg-blue-600 border-blue-500 text-white hover:bg-blue-500 hover:scale-105 active:scale-95"
+                  className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all duration-300 shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-[black] bg-[black] text-slate-200 hover:bg-white hover:border-white hover:text-black hover:scale-105 active:scale-95"
                 >
                   <Smartphone className="w-6 h-6" /> Remote Camera
                 </button>
               </div>
               <div>
-                <p className="text-neutral-300 text-lg font-medium">Select a camera source to begin live detection</p>
-                <p className="text-neutral-400 text-md mt-1">Dashboard supports local webcam, remote phones, or CCTV</p>
+                <p className="text-neutral-900 text-lg font-medium">Select a camera source to begin live detection</p>
+                <p className="text-neutral-700 text-md mt-1">Dashboard supports local webcam, remote phones, or CCTV</p>
               </div>
             </div>
           </div>
@@ -345,7 +449,7 @@ export default function Home() {
                   setVideoSource('remote');
                   setIsActive(true);
                 }}
-                className="w-full bg-black hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95"
+                className="w-full bg-black hover:bg-[#97c1e6] hover:text-black text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95"
               >
                 Wait for Connection
               </button>
@@ -454,22 +558,77 @@ export default function Home() {
               {incidentLog.map((inc) => (
                 <div
                   key={inc.id}
-                  className="flex items-center gap-5 bg-white border border-red-200 shadow-sm rounded-2xl px-6 py-4"
+                  className={`flex items-center gap-5 bg-white shadow-sm rounded-2xl px-6 py-4 border ${
+                    inc.feedback === 'confirmed' ? 'border-red-300 bg-red-50/30' :
+                    inc.feedback === 'false_alarm' ? 'border-slate-300 bg-slate-50 opacity-60' :
+                    'border-red-200'
+                  }`}
                 >
-                  <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="w-4 h-4 text-red-500" />
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
+                    inc.feedback === 'false_alarm' ? 'bg-slate-100' : 'bg-red-100'
+                  }`}>
+                    <AlertTriangle className={`w-4 h-4 ${
+                      inc.feedback === 'false_alarm' ? 'text-slate-400' : 'text-red-500'
+                    }`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-bold text-red-600">Incident #{inc.id}</p>
+                    <p className={`text-sm font-bold ${
+                      inc.feedback === 'false_alarm' ? 'text-slate-400 line-through' : 'text-red-600'
+                    }`}>Incident #{inc.id}</p>
                     <p className="text-xs text-slate-500 mt-0.5">
                       {inc.personsDetected} person{inc.personsDetected !== 1 ? 's' : ''} · Duration {inc.duration} · Peak risk {inc.maxRisk}%
                     </p>
                   </div>
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                     <p className="text-xs font-medium text-slate-500">{inc.time}</p>
-                    <span className="mt-1 inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600 border border-red-200">
-                      HIGH RISK
-                    </span>
+                    {inc.feedback ? (
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                        inc.feedback === 'confirmed'
+                          ? 'bg-red-100 text-red-600 border border-red-200'
+                          : 'bg-slate-100 text-slate-500 border border-slate-200'
+                      }`}>
+                        {inc.feedback === 'confirmed' ? '✓ CONFIRMED' : '✗ FALSE ALARM'}
+                      </span>
+                    ) : (
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => {
+                            setIncidentLog(prev => prev.map(i => i.id === inc.id ? { ...i, feedback: 'confirmed' } : i));
+                            fetch(`${window.location.protocol}//localhost:8000/feedback`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                session_id: currentSessionIdRef.current ?? 0,
+                                incident_id: inc.id,
+                                verdict: 'confirmed',
+                                max_risk_at_time: inc.maxRisk,
+                              }),
+                            }).catch(() => {});
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
+                        >
+                          <CheckCircle2 className="w-3 h-3" /> Confirm
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIncidentLog(prev => prev.map(i => i.id === inc.id ? { ...i, feedback: 'false_alarm' } : i));
+                            fetch(`${window.location.protocol}//localhost:8000/feedback`, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                session_id: currentSessionIdRef.current ?? 0,
+                                incident_id: inc.id,
+                                verdict: 'false_alarm',
+                                max_risk_at_time: inc.maxRisk,
+                              }),
+                            }).catch(() => {});
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100 transition-colors"
+                        >
+                          <XCircle className="w-3 h-3" /> False Alarm
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

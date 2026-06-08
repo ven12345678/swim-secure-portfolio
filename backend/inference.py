@@ -33,7 +33,7 @@ class DrowningLSTM(nn.Module):
 
 # ── Load models ───────────────────────────────────────────────────────────────
 try:
-    yolo_model = YOLO('models/yolo_best.pt')
+    yolo_model = YOLO('models/yolo_best_v3.pt')
     print("✅ YOLO model loaded")
 except Exception as e:
     yolo_model = None
@@ -42,7 +42,7 @@ except Exception as e:
 try:
     lstm_model = DrowningLSTM(input_size=11).to(device)
     lstm_model.load_state_dict(
-        torch.load('models/lstm_best_v3.pt', map_location=device)
+        torch.load('models/lstm_best_v8_nightft.pt', map_location=device)
     )
     lstm_model.eval()
     print("✅ LSTM model loaded")
@@ -51,9 +51,9 @@ except Exception as e:
     print(f"❌ Failed to load LSTM model: {e}")
 
 # ── Settings ──────────────────────────────────────────────────────────────────
-CONF_THRESHOLD  = 0.3
-ALERT_THRESHOLD = 0.50
-WINDOW_SIZE     = 15
+CONF_THRESHOLD  = 0.25
+ALERT_THRESHOLD = 0.20
+WINDOW_SIZE     = 30
 
 # ── Per-person feature buffer ─────────────────────────────────────────────────
 # Stores raw bbox features for each tracked person_id
@@ -154,7 +154,7 @@ def get_lstm_drowning_risk(track_history: list, person_id: int) -> float:
         return 0.0
 
     if person_id not in person_buffers:
-        person_buffers[person_id] = deque(maxlen=15)
+        person_buffers[person_id] = deque(maxlen=30)
 
     buf = person_buffers[person_id]
 

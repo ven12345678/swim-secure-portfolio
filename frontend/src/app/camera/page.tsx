@@ -92,7 +92,7 @@ export default function CameraStreamer() {
             screenshotFormat="image/jpeg"
             className="absolute inset-0 w-full h-full object-cover"
             videoConstraints={{ facingMode: 'environment' }}
-            onUserMediaError={(err) => setError("Camera access denied or unavailable. " + err.message)}
+            onUserMediaError={(err) => setError("Camera access denied or unavailable. " + (typeof err === 'string' ? err : (err.message || '')))}
           />
           
           {/* Overlay Status */}

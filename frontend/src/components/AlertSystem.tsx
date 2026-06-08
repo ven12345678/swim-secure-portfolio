@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { PhoneCall, AlertOctagon, X } from 'lucide-react';
+import EmergencyDispatchModal from './EmergencyDispatchModal';
 
 interface AlertSystemProps {
   isIncidentActive: boolean;
@@ -12,6 +13,7 @@ export default function AlertSystem({ isIncidentActive, isActive = true }: Alert
   const [sirenActive, setSirenActive] = useState(false);
   const [showEmergencyBtn, setShowEmergencyBtn] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const sirenLoopRef = useRef<NodeJS.Timeout | null>(null);
@@ -107,50 +109,62 @@ export default function AlertSystem({ isIncidentActive, isActive = true }: Alert
   };
 
   const handleCallEmergency = () => {
-    alert('Initiating emergency services contact... (Simulated)');
+    setShowDispatchModal(true);
+    // Optionally stop siren when dispatch is called
+    setSirenActive(false);
+    stopSiren();
   };
 
-  if (!sirenActive && !showEmergencyBtn) return null;
+  if (!sirenActive && !showEmergencyBtn && !showDispatchModal) return null;
 
   return (
-    <div className="fixed inset-x-0 bottom-32 z-50 flex flex-col items-center gap-3 pointer-events-none">
-      <div className="pointer-events-auto relative flex items-center gap-4 bg-red-600/90 backdrop-blur-xl border border-red-400/60 shadow-[0_0_60px_rgba(220,38,38,0.6)] px-8 py-4 rounded-2xl animate-pulse">
-        <AlertOctagon className="w-7 h-7 text-white" />
-        <span className="text-white font-bold tracking-widest uppercase text-lg">⚠ Drowning Detected</span>
-      </div>
-
-      {showEmergencyBtn && (
-        <div className="pointer-events-auto flex items-center gap-4 mt-2">
-          {/* Call Emergency Group */}
-          <div className="flex bg-white rounded-full shadow-2xl border border-red-200 overflow-hidden hover:scale-105 transition-transform">
-            <button
-              onClick={handleCallEmergency}
-              className="hover:bg-red-50 text-red-600 font-bold px-8 py-4 flex items-center gap-3 transition-colors active:bg-red-100"
-            >
-              <PhoneCall className="w-5 h-5" />
-              CALL EMERGENCY SERVICES
-            </button>
-            <div className="w-px bg-red-100 my-2" />
-            <button
-              onClick={handleDismiss}
-              className="hover:bg-red-50 text-red-400 hover:text-red-600 px-5 py-4 flex items-center transition-colors"
-              title="Dismiss Emergency"
-            >
-              <X className="w-5 h-5" />
-            </button>
+    <>
+      {(sirenActive || showEmergencyBtn) && (
+        <div className="fixed inset-x-0 bottom-32 z-50 flex flex-col items-center gap-3 pointer-events-none">
+          <div className="pointer-events-auto relative flex items-center gap-4 bg-red-600/90 backdrop-blur-xl border border-red-400/60 shadow-[0_0_60px_rgba(220,38,38,0.6)] px-8 py-4 rounded-2xl animate-pulse">
+            <AlertOctagon className="w-7 h-7 text-white" />
+            <span className="text-white font-bold tracking-widest uppercase text-lg">⚠ Drowning Detected</span>
           </div>
 
-          {sirenActive && (
-            <button
-              onClick={handleStopAlert}
-              className="bg-neutral-800 hover:bg-neutral-700 text-white font-bold px-8 py-4 rounded-full shadow-2xl flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border border-neutral-600"
-            >
-              <X className="w-5 h-5" />
-              STOP ALERT
-            </button>
+          {showEmergencyBtn && (
+            <div className="pointer-events-auto flex items-center gap-4 mt-2">
+              {/* Call Emergency Group */}
+              <div className="flex bg-white rounded-full shadow-2xl border border-red-200 overflow-hidden hover:scale-105 transition-transform">
+                <button
+                  onClick={handleCallEmergency}
+                  className="hover:bg-red-50 text-red-600 font-bold px-8 py-4 flex items-center gap-3 transition-colors active:bg-red-100"
+                >
+                  <PhoneCall className="w-5 h-5" />
+                  CALL EMERGENCY SERVICES
+                </button>
+                <div className="w-px bg-red-100 my-2" />
+                <button
+                  onClick={handleDismiss}
+                  className="hover:bg-red-50 text-red-400 hover:text-red-600 px-5 py-4 flex items-center transition-colors"
+                  title="Dismiss Emergency"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {sirenActive && (
+                <button
+                  onClick={handleStopAlert}
+                  className="bg-neutral-800 hover:bg-neutral-700 text-white font-bold px-8 py-4 rounded-full shadow-2xl flex items-center gap-2 transition-all hover:scale-105 active:scale-95 border border-neutral-600"
+                >
+                  <X className="w-5 h-5" />
+                  STOP ALERT
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
-    </div>
+      
+      <EmergencyDispatchModal 
+        isOpen={showDispatchModal} 
+        onClose={() => setShowDispatchModal(false)} 
+      />
+    </>
   );
 }
