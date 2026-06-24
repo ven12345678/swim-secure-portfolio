@@ -88,6 +88,10 @@ export default function HistoryPage() {
   const [feedbacksLoading, setFeedbacksLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 
+  // New states for filtering
+  const [filter, setFilter] = useState<'all' | 'high_risk' | 'confirmed' | 'false_alarm'>('all');
+  const [allFeedbacks, setAllFeedbacks] = useState<FeedbackRow[]>([]);
+
   useEffect(() => setIsMounted(true), []);
 
   const fetchSessions = useCallback(async () => {
@@ -134,9 +138,32 @@ export default function HistoryPage() {
     }
   }, []);
 
+  const fetchAllFeedbacks = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/feedback`);
+      const data = await res.json();
+      setAllFeedbacks(Array.isArray(data) ? data : []);
+    } catch {
+      setAllFeedbacks([]);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSessions();
-  }, [fetchSessions]);
+    fetchAllFeedbacks();
+  }, [fetchSessions, fetchAllFeedbacks]);
+
+  // Derived state for filtering sessions
+  const filteredSessions = sessions.filter(s => {
+    if (filter === 'all') return true;
+    if (filter === 'high_risk') return s.peak_risk >= 70 || s.total_incidents > 0;
+    
+    const sessionFeedbacks = allFeedbacks.filter(fb => fb.session_id === s.id);
+    if (filter === 'confirmed') return sessionFeedbacks.some(fb => fb.verdict === 'confirmed');
+    if (filter === 'false_alarm') return sessionFeedbacks.some(fb => fb.verdict === 'false_alarm');
+    
+    return true;
+  });
 
   const handleSelectSession = (s: SessionRow) => {
     setSelectedSession(s);
@@ -184,7 +211,7 @@ export default function HistoryPage() {
                   SwimSecure
                 </p>
                 <p className="text-[10px] tracking-widest text-slate-500 uppercase">
-                  Session History
+                  Session and Incident History
                 </p>
               </div>
             </div>
@@ -216,27 +243,52 @@ export default function HistoryPage() {
           ))}
         </div>
 
+        {/* ── Filters ── */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          <span className="text-sm font-bold text-slate-700 mr-1">Filter:</span>
+          {['all', 'high_risk', 'confirmed', 'false_alarm'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f as any)}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                filter === f 
+                  ? 'bg-slate-800 text-white shadow-sm' 
+                  : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200 shadow-sm'
+              }`}
+            >
+              {f === 'all' && 'All'}
+              {f === 'high_risk' && 'High Risk'}
+              {f === 'confirmed' && 'Confirmed'}
+              {f === 'false_alarm' && 'False Alarm'}
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* ── Session List ── */}
           <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
               <h2 className="text-sm font-bold text-slate-800">Sessions</h2>
-              <span className="text-xs text-slate-400">{total} total</span>
+              <span className="text-xs text-slate-400">{filteredSessions.length} matching</span>
             </div>
 
             {loading ? (
               <div className="flex items-center justify-center py-16 text-slate-400 text-sm">
                 Loading…
               </div>
-            ) : sessions.length === 0 ? (
+            ) : filteredSessions.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 gap-2 text-slate-400">
                 <Clock className="w-8 h-8 opacity-40" />
-                <p className="text-sm font-medium">No sessions yet</p>
-                <p className="text-xs">Start monitoring to record data</p>
+                <p className="text-sm font-medium">No records found for this filter.</p>
+                {filter !== 'all' && (
+                  <button onClick={() => setFilter('all')} className="text-xs text-[#6f8faf] hover:underline mt-1 font-semibold">
+                    Clear filters
+                  </button>
+                )}
               </div>
             ) : (
               <ul className="divide-y divide-slate-50 max-h-[60vh] overflow-y-auto">
-                {sessions.map((s) => (
+                {filteredSessions.map((s) => (
                   <li key={s.id}>
                     <button
                       onClick={() => handleSelectSession(s)}
@@ -442,11 +494,10 @@ export default function HistoryPage() {
                       {feedbacks.map((fb) => (
                         <div
                           key={fb.id}
-                          className={`flex items-center justify-between p-3 rounded-xl border text-xs ${
-                            fb.verdict === "confirmed"
+                          className={`flex items-center justify-between p-3 rounded-xl border text-xs ${fb.verdict === "confirmed"
                               ? "bg-red-50/50 border-red-200"
                               : "bg-slate-50 border-slate-200 opacity-80"
-                          }`}
+                            }`}
                         >
                           <div className="flex items-center gap-2">
                             <span className={`font-bold ${fb.verdict === "confirmed" ? "text-red-600" : "text-slate-500"}`}>
@@ -459,11 +510,10 @@ export default function HistoryPage() {
                           <div className="flex items-center gap-3">
                             <span className="text-slate-500">Risk: {Math.round(fb.max_risk_at_time)}%</span>
                             <span
-                              className={`px-2 py-0.5 rounded-full font-bold text-[9px] uppercase border ${
-                                fb.verdict === "confirmed"
+                              className={`px-2 py-0.5 rounded-full font-bold text-[9px] uppercase border ${fb.verdict === "confirmed"
                                   ? "bg-red-100 text-red-700 border-red-200"
                                   : "bg-slate-100 text-slate-600 border-slate-200"
-                              }`}
+                                }`}
                             >
                               {fb.verdict === "confirmed" ? "Confirmed" : "False Alarm"}
                             </span>

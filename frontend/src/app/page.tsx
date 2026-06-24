@@ -4,7 +4,8 @@ import React, { useState, useCallback, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import VideoProcessor from '../components/VideoProcessor';
 import AlertSystem from '../components/AlertSystem';
-import { BackendResponse, DetectionBox } from '../types';
+import LocationSelector from '../components/LocationSelector';
+import { BackendResponse, DetectionBox, LocationData } from '../types';
 import {
   Shield,
   Waves,
@@ -97,6 +98,11 @@ export default function Home() {
   const [showThresholdSlider, setShowThresholdSlider] = useState(false);
   const currentSessionIdRef = useRef<number | null>(null);
 
+  // ── location state ──────────────────────────────────────────────────────────
+  const [showLocationSelector, setShowLocationSelector] = useState(false);
+  const [pendingVideoSource, setPendingVideoSource] = useState<'camera' | 'upload' | 'remote' | null>(null);
+  const [poolLocation, setPoolLocation] = useState<LocationData | null>(null);
+
   useEffect(() => {
     setIsMounted(true);
     const protocol = window.location.protocol; // 'https:' or 'http:'
@@ -114,7 +120,7 @@ export default function Home() {
       .then(cfg => {
         if (cfg.alert_threshold) setAlertThreshold(Math.round(cfg.alert_threshold * 100));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   // ── data handler ────────────────────────────────────────────────────────────
@@ -158,11 +164,11 @@ export default function Home() {
     if (!nowActive && lastIncidentStateRef.current && incidentStartRef.current !== null) {
       const durSec = Math.round((Date.now() - incidentStartRef.current) / 1000);
       incidentCounterRef.current += 1;
-      
+
       const loggedPeakRisk = Math.round(peakIncidentRiskRef.current);
       const loggedPeakPersons = peakPersonsRef.current;
       console.log("[Incident End] Logged Peak Risk:", loggedPeakRisk, "Persons:", loggedPeakPersons);
-      
+
       setIncidentLog((prev) => [
         {
           id: incidentCounterRef.current,
@@ -322,7 +328,7 @@ export default function Home() {
           </div>
           <div>
             <h1 className={`text-base font-bold leading-tight tracking-tight text-black`}>SwimSecure</h1>
-            <p className={`text-[12px] tracking-widest text-black`}>Real Time Drowning Detection</p>
+            <p className={`text-[12px] tracking-widest text-black`}>Real-Time Drowning Detection</p>
           </div>
         </div>
 
@@ -331,13 +337,12 @@ export default function Home() {
           {isActive && latencyMs !== null && (
             <div className="flex items-center gap-1.5 bg-neutral-900/70 backdrop-blur-md border border-neutral-700/60 px-3 py-2 rounded-xl">
               <Gauge className="w-3.5 h-3.5 text-blue-400" />
-              <span className={`text-xs font-bold font-mono ${
-                latencyMs > 500 ? 'text-red-400' : latencyMs > 200 ? 'text-yellow-400' : 'text-green-400'
-              }`}>{latencyMs}ms</span>
+              <span className={`text-xs font-bold font-mono ${latencyMs > 500 ? 'text-red-400' : latencyMs > 200 ? 'text-yellow-400' : 'text-green-400'
+                }`}>Dashboard Latency: {latencyMs}ms</span>
             </div>
           )}
           <div className="flex items-center gap-2 bg-neutral-900/70 backdrop-blur-md border border-neutral-700/60 px-4 py-2 rounded-xl">
-            <span className="text-xs text-neutral-300">Person in pool: </span>
+            <span className="text-xs text-neutral-300">Swimmers Detected: </span>
             <span className="text-sm font-bold text-white">{totalPersons}</span>
           </div>
           <Link
@@ -387,7 +392,7 @@ export default function Home() {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ alert_threshold: val / 100 }),
-                }).catch(() => {});
+                }).catch(() => { });
               }}
               className="w-full accent-blue-500"
             />
@@ -405,7 +410,7 @@ export default function Home() {
               <div className="flex gap-4">
                 <button
                   id="start-btn"
-                  onClick={() => { setVideoSource('camera'); setIsActive(true); }}
+                  onClick={() => { setPendingVideoSource('camera'); setShowLocationSelector(true); }}
                   className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all duration-300 shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-[black] bg-[black] text-slate-200 hover:bg-white hover:border-white hover:text-black hover:scale-105 active:scale-95"
                 >
                   <Play className="w-6 h-6 fill-current" /> Local Camera
@@ -420,6 +425,55 @@ export default function Home() {
               <div>
                 <p className="text-neutral-900 text-lg font-medium">Select a camera source to begin live detection</p>
                 <p className="text-neutral-700 text-md mt-1">Dashboard supports local webcam, remote phones, or CCTV</p>
+              </div>
+
+              {/* ── System Overview Strip ── */}
+              <div className="w-full max-w-3xl px-4 mt-5">
+                <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.18em] mb-2 text-center">
+                  System Overview
+                </h3>
+
+                <div className="bg-white/80  rounded-xl border border-slate-200/60  px-4 py-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-300/50">
+
+                    <div className="flex items-center gap-3 py-2 md:py-1 md:pr-4">
+                      <Camera className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-semibold text-slate-700 leading-tight">
+                          Inputs
+                        </p>
+                        <p className="text-[13px] text-slate-500 leading-tight md:whitespace-nowrap">
+                          Local · Remote · Upload
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 py-2 md:py-1 md:px-4">
+                      <Activity className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-semibold text-slate-700 leading-tight">
+                          Model
+                        </p>
+                        <p className="text-[13px] text-slate-500 leading-tight md:whitespace-nowrap">
+                          YOLOv11 + LSTM
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-3 py-2 md:py-1 md:pl-4">
+                      <AlertTriangle className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-[15px] font-semibold text-slate-700 leading-tight">
+                          Output
+                        </p>
+                        <p className="text-[13px] text-slate-500 leading-tight md:whitespace-nowrap">
+                          Risk · Alert · History
+                        </p>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -446,8 +500,8 @@ export default function Home() {
               <button
                 onClick={() => {
                   setShowQRModal(false);
-                  setVideoSource('remote');
-                  setIsActive(true);
+                  setPendingVideoSource('remote');
+                  setShowLocationSelector(true);
                 }}
                 className="w-full bg-black hover:bg-[#97c1e6] hover:text-black text-white font-bold py-3.5 rounded-xl transition-all shadow-lg active:scale-95"
               >
@@ -500,7 +554,29 @@ export default function Home() {
       </section>
 
       {/* Alert overlay */}
-      <AlertSystem isIncidentActive={isIncidentActive} isActive={isActive} />
+      <AlertSystem 
+        isIncidentActive={isIncidentActive} 
+        isActive={isActive} 
+        poolLocation={poolLocation} 
+        affectedSwimmers={peakPersonsRef.current} 
+      />
+
+      <LocationSelector
+        isOpen={showLocationSelector}
+        onSelect={(loc) => {
+          setPoolLocation(loc);
+          setShowLocationSelector(false);
+          if (pendingVideoSource) {
+            setVideoSource(pendingVideoSource);
+            setIsActive(true);
+            setPendingVideoSource(null);
+          }
+        }}
+        onCancel={() => {
+          setShowLocationSelector(false);
+          setPendingVideoSource(null);
+        }}
+      />
 
       <section className="max-w-5xl mx-auto px-6 py-16 space-y-14">
 
@@ -558,23 +634,19 @@ export default function Home() {
               {incidentLog.map((inc) => (
                 <div
                   key={inc.id}
-                  className={`flex items-center gap-5 bg-white shadow-sm rounded-2xl px-6 py-4 border ${
-                    inc.feedback === 'confirmed' ? 'border-red-300 bg-red-50/30' :
+                  className={`flex items-center gap-5 bg-white shadow-sm rounded-2xl px-6 py-4 border ${inc.feedback === 'confirmed' ? 'border-red-300 bg-red-50/30' :
                     inc.feedback === 'false_alarm' ? 'border-slate-300 bg-slate-50 opacity-60' :
-                    'border-red-200'
-                  }`}
+                      'border-red-200'
+                    }`}
                 >
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                    inc.feedback === 'false_alarm' ? 'bg-slate-100' : 'bg-red-100'
-                  }`}>
-                    <AlertTriangle className={`w-4 h-4 ${
-                      inc.feedback === 'false_alarm' ? 'text-slate-400' : 'text-red-500'
-                    }`} />
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${inc.feedback === 'false_alarm' ? 'bg-slate-100' : 'bg-red-100'
+                    }`}>
+                    <AlertTriangle className={`w-4 h-4 ${inc.feedback === 'false_alarm' ? 'text-slate-400' : 'text-red-500'
+                      }`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-bold ${
-                      inc.feedback === 'false_alarm' ? 'text-slate-400 line-through' : 'text-red-600'
-                    }`}>Incident #{inc.id}</p>
+                    <p className={`text-sm font-bold ${inc.feedback === 'false_alarm' ? 'text-slate-400 line-through' : 'text-red-600'
+                      }`}>Incident #{inc.id}</p>
                     <p className="text-xs text-slate-500 mt-0.5">
                       {inc.personsDetected} person{inc.personsDetected !== 1 ? 's' : ''} · Duration {inc.duration} · Peak risk {inc.maxRisk}%
                     </p>
@@ -582,11 +654,10 @@ export default function Home() {
                   <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
                     <p className="text-xs font-medium text-slate-500">{inc.time}</p>
                     {inc.feedback ? (
-                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                        inc.feedback === 'confirmed'
-                          ? 'bg-red-100 text-red-600 border border-red-200'
-                          : 'bg-slate-100 text-slate-500 border border-slate-200'
-                      }`}>
+                      <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${inc.feedback === 'confirmed'
+                        ? 'bg-red-100 text-red-600 border border-red-200'
+                        : 'bg-slate-100 text-slate-500 border border-slate-200'
+                        }`}>
                         {inc.feedback === 'confirmed' ? '✓ CONFIRMED' : '✗ FALSE ALARM'}
                       </span>
                     ) : (
@@ -603,7 +674,7 @@ export default function Home() {
                                 verdict: 'confirmed',
                                 max_risk_at_time: inc.maxRisk,
                               }),
-                            }).catch(() => {});
+                            }).catch(() => { });
                           }}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
                         >
@@ -621,7 +692,7 @@ export default function Home() {
                                 verdict: 'false_alarm',
                                 max_risk_at_time: inc.maxRisk,
                               }),
-                            }).catch(() => {});
+                            }).catch(() => { });
                           }}
                           className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100 transition-colors"
                         >
@@ -685,7 +756,7 @@ export default function Home() {
                 {/* Activate analysis button */}
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setVideoSource('upload'); setIsActive(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    onClick={() => { setPendingVideoSource('upload'); setShowLocationSelector(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-all shadow-md"
                   >
                     <Camera className="w-4 h-4" /> Analyze in Full Screen

@@ -15,3 +15,9 @@ export interface BackendResponse {
   incident_active: boolean;
   latency_ms?: number;
 }
+
+export interface LocationData {
+  address: string;
+  lat: number;
+  lng: number;
+}

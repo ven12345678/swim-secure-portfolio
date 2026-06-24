@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { AlertTriangle, MapPin, Camera as CameraIcon, ShieldAlert, CheckCircle2, Clock, X, PhoneCall, Minimize2, Maximize2, GripHorizontal } from "lucide-react";
+import { LocationData } from "../types";
 
 interface Message {
   id: number;
@@ -13,9 +14,11 @@ interface Message {
 interface EmergencyDispatchModalProps {
   isOpen: boolean;
   onClose: () => void;
+  poolLocation?: LocationData | null;
+  affectedSwimmers?: number;
 }
 
-export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDispatchModalProps) {
+export default function EmergencyDispatchModal({ isOpen, onClose, poolLocation, affectedSwimmers = 1 }: EmergencyDispatchModalProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [callStatus, setCallStatus] = useState<"connecting" | "connected" | "ended">("connecting");
@@ -28,27 +31,50 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
-  // Define the automated sequence
-  const sequence: Message[] = [
-    { id: 1, sender: "system", text: "Initiating automated SOS protocol...", delayMs: 1000 },
-    {
-      id: 2,
-      sender: "system",
-      text: (
-        <div className="flex flex-col gap-2">
-          <span>Transmitting Location Data:</span>
-          <div className="bg-slate-900/50 p-2 rounded-lg flex items-center gap-2 border border-slate-700">
-            <MapPin className="w-4 h-4 text-blue-400" />
-            <span className="font-mono text-xs text-blue-300">3.1412° N, 101.6865° E (Pool 1)</span>
+  const sequence = useMemo(() => {
+    const currentTime = new Date().toLocaleTimeString();
+    const currentDate = new Date().toLocaleDateString();
+    
+    const address = poolLocation?.address || "Unknown Location";
+    const lat = poolLocation?.lat.toFixed(6) || "0.000000";
+    const lng = poolLocation?.lng.toFixed(6) || "0.000000";
+    const swimmers = affectedSwimmers || 1;
+
+    return [
+      { id: 1, sender: "system", text: "Initiating automated SOS protocol...", delayMs: 1000 },
+      {
+        id: 2,
+        sender: "system",
+        text: (
+          <div className="flex flex-col gap-3 font-mono text-xs">
+            <p className="text-red-400 font-bold uppercase tracking-wider">Automated Dispatch Report</p>
+            <p className="text-blue-100">Drowning emergency reported by pool operator at {address}. Emergency assistance is required at the pool area.</p>
+            
+            <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-700/50 text-blue-200">
+              <p className="text-slate-400 mb-1">=== INCIDENT DETAILS ===</p>
+              <p><span className="text-slate-400">Time:</span> {currentTime}, {currentDate}</p>
+              <p><span className="text-slate-400">Location:</span> Swimming Pool, {address}</p>
+              <p><span className="text-slate-400">Coordinates:</span> {lat}, {lng}</p>
+              <p><span className="text-slate-400">Affected swimmers:</span> {swimmers}</p>
+              <p><span className="text-slate-400">Condition:</span> Swimmer unresponsive</p>
+            </div>
+
+            <p className="text-blue-100">Please send medical emergency assistance to the pool area. Site security will meet responders at main lobby and guide them to the exact location.</p>
+            
+            <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-700/50 text-blue-200">
+              <p className="text-slate-400 mb-1">=== ON-SITE CONTACT ===</p>
+              <p>Security Control Room</p>
+              <p>+60 376526600</p>
+            </div>
           </div>
-        </div>
-      ),
-      delayMs: 2000,
-    },
-    { id: 3, sender: "dispatch", text: "911 Emergency. We have received your distress signal and GPS location.", delayMs: 3000 },
-    { id: 4, sender: "dispatch", text: "Ambulance dispatched to Pool 1. ETA 4 Minutes.", delayMs: 2000 },
-    { id: 5, sender: "dispatch", text: "Please ensure access routes are clear. Paramedics are en route.", delayMs: 2000 },
-  ];
+        ),
+        delayMs: 2000,
+      },
+      { id: 3, sender: "dispatch", text: "999 Emergency Dispatch. Incident report received and logged.", delayMs: 3000 },
+      { id: 4, sender: "dispatch", text: `First responders dispatched to ${address}. ETA 4 Minutes.`, delayMs: 2000 },
+      { id: 5, sender: "dispatch", text: "Please keep the line open. Paramedics are en route.", delayMs: 2000 },
+    ] as Message[];
+  }, [poolLocation, affectedSwimmers]);
 
   // Handle the chat sequence
   useEffect(() => {
@@ -70,7 +96,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
           );
           utterance.voice = window.speechSynthesis.getVoices().find(v => v.name.includes("Female") || v.lang.includes("en-US")) || null;
           utterance.rate = 0.95;
-          utterance.pitch = 1.0; 
+          utterance.pitch = 1.0;
           window.speechSynthesis.speak(utterance);
           setCallStatus("connected");
         }
@@ -104,7 +130,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]);
+  }, [isOpen, sequence]);
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
@@ -140,7 +166,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
 
   if (isMinimized) {
     return (
-      <div 
+      <div
         className="fixed z-[100] bottom-6 right-6 bg-slate-900 border border-slate-700 text-white p-3 rounded-full shadow-2xl flex items-center gap-3 cursor-pointer hover:bg-slate-800 transition-colors animate-in slide-in-from-bottom-4"
         onClick={() => setIsMinimized(false)}
       >
@@ -154,10 +180,10 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
   }
 
   return (
-    <div 
-      className="fixed z-[100] flex flex-col bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden w-full max-w-lg h-[500px]"
-      style={{ 
-        left: position.x, 
+    <div
+      className="fixed z-[100] flex flex-col bg-slate-950 border border-slate-800 rounded-3xl shadow-2xl overflow-hidden w-full max-w-lg h-[600px]"
+      style={{
+        left: position.x,
         top: position.y,
         touchAction: 'none' // Prevent default touch actions while dragging
       }}
@@ -168,7 +194,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
       </div>
 
       {/* Header (Draggable) */}
-      <div 
+      <div
         className="relative z-10 bg-slate-900 border-b border-slate-800 px-4 py-3 flex items-center justify-between cursor-move"
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -191,7 +217,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
             </div>
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           <button
             onClick={(e) => { e.stopPropagation(); setIsMinimized(true); }}
@@ -222,11 +248,10 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
 
         {messages.map((msg) => (
           <div key={msg.id} className={`flex w-full ${msg.sender === "system" ? "justify-end" : "justify-start"}`}>
-            <div className={`max-w-[85%] rounded-2xl p-3 ${
-              msg.sender === "system" 
-                ? "bg-blue-600/20 border border-blue-500/30 text-blue-50 rounded-tr-sm" 
+            <div className={`max-w-[85%] rounded-2xl p-3 ${msg.sender === "system"
+                ? "bg-blue-600/20 border border-blue-500/30 text-blue-50 rounded-tr-sm"
                 : "bg-slate-800 border border-slate-700 text-slate-200 rounded-tl-sm"
-            }`}>
+              }`}>
               <div className="flex items-center gap-2 mb-1.5 opacity-70">
                 {msg.sender === "system" ? (
                   <span className="text-[9px] font-bold uppercase tracking-widest text-blue-400">SwimSecure System</span>
@@ -235,7 +260,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
                     <ShieldAlert className="w-2.5 h-2.5" /> 911 Dispatch
                   </span>
                 )}
-                <span className="text-[9px] ml-auto"><Clock className="w-2.5 h-2.5 inline mr-1"/>{new Date().toLocaleTimeString()}</span>
+                <span className="text-[9px] ml-auto"><Clock className="w-2.5 h-2.5 inline mr-1" />{new Date().toLocaleTimeString()}</span>
               </div>
               <div className="text-sm font-medium leading-relaxed">
                 {msg.text}
@@ -260,7 +285,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose }: EmergencyDis
       <div className="relative z-10 bg-slate-900 border-t border-slate-800 p-3">
         <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
           <span>End-to-end encrypted dispatch line</span>
-          <button 
+          <button
             onClick={() => {
               if ("speechSynthesis" in window) window.speechSynthesis.cancel();
               onClose();

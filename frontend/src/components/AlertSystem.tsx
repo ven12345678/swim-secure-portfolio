@@ -7,9 +7,11 @@ import EmergencyDispatchModal from './EmergencyDispatchModal';
 interface AlertSystemProps {
   isIncidentActive: boolean;
   isActive?: boolean;
+  poolLocation: any;
+  affectedSwimmers: number;
 }
 
-export default function AlertSystem({ isIncidentActive, isActive = true }: AlertSystemProps) {
+export default function AlertSystem({ isIncidentActive, isActive = true, poolLocation, affectedSwimmers }: AlertSystemProps) {
   const [sirenActive, setSirenActive] = useState(false);
   const [showEmergencyBtn, setShowEmergencyBtn] = useState(false);
   const [dismissed, setDismissed] = useState(false);
@@ -164,6 +166,8 @@ export default function AlertSystem({ isIncidentActive, isActive = true }: Alert
       <EmergencyDispatchModal 
         isOpen={showDispatchModal} 
         onClose={() => setShowDispatchModal(false)} 
+        poolLocation={poolLocation}
+        affectedSwimmers={affectedSwimmers}
       />
     </>
   );
