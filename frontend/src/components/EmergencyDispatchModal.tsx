@@ -19,6 +19,7 @@ interface EmergencyDispatchModalProps {
 }
 
 export default function EmergencyDispatchModal({ isOpen, onClose, poolLocation, affectedSwimmers = 1 }: EmergencyDispatchModalProps) {
+  const sequenceRef = useRef<Message[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const [callStatus, setCallStatus] = useState<"connecting" | "connected" | "ended">("connecting");
@@ -34,7 +35,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose, poolLocation, 
   const sequence = useMemo(() => {
     const currentTime = new Date().toLocaleTimeString();
     const currentDate = new Date().toLocaleDateString();
-    
+
     const address = poolLocation?.address || "Unknown Location";
     const lat = poolLocation?.lat.toFixed(6) || "0.000000";
     const lng = poolLocation?.lng.toFixed(6) || "0.000000";
@@ -49,7 +50,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose, poolLocation, 
           <div className="flex flex-col gap-3 font-mono text-xs">
             <p className="text-red-400 font-bold uppercase tracking-wider">Automated Dispatch Report</p>
             <p className="text-blue-100">Drowning emergency reported by pool operator at {address}. Emergency assistance is required at the pool area.</p>
-            
+
             <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-700/50 text-blue-200">
               <p className="text-slate-400 mb-1">=== INCIDENT DETAILS ===</p>
               <p><span className="text-slate-400">Time:</span> {currentTime}, {currentDate}</p>
@@ -60,7 +61,7 @@ export default function EmergencyDispatchModal({ isOpen, onClose, poolLocation, 
             </div>
 
             <p className="text-blue-100">Please send medical emergency assistance to the pool area. Site security will meet responders at main lobby and guide them to the exact location.</p>
-            
+
             <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-700/50 text-blue-200">
               <p className="text-slate-400 mb-1">=== ON-SITE CONTACT ===</p>
               <p>Security Control Room</p>
@@ -76,40 +77,53 @@ export default function EmergencyDispatchModal({ isOpen, onClose, poolLocation, 
     ] as Message[];
   }, [poolLocation, affectedSwimmers]);
 
-  // Handle the chat sequence
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      // Clean up when modal closes
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+      hasSpoken.current = false;
+      setCallStatus("connecting");
+      return;
+    }
+
+    // Snapshot the sequence at open-time (reads the current useMemo value once)
+    sequenceRef.current = sequence;
 
     setMessages([]);
     setCallStatus("connecting");
     hasSpoken.current = false;
-    let timeoutIds: NodeJS.Timeout[] = [];
+    const timeoutIds: NodeJS.Timeout[] = [];
     let cumulativeDelay = 0;
 
-    // AI Voice Synthesis
-    if ("speechSynthesis" in window) {
-      setTimeout(() => {
-        if (!hasSpoken.current) {
-          hasSpoken.current = true;
+    // Cancel any queued speech before starting a fresh utterance
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+
+    // AI Voice Synthesis – fires once, 800 ms after opening
+    const speechTimeoutId = setTimeout(() => {
+      if (!hasSpoken.current) {
+        hasSpoken.current = true;
+        if ("speechSynthesis" in window) {
           const utterance = new SpeechSynthesisUtterance(
-            "9 1 1 emergency. We have received your automated distress signal. An ambulance is being dispatched to your location immediately. Please stay clear of the area, paramedics are en route."
+            "9 9 9 emergency we have received a drowning incident. Emergency services are being dispatched immediately. Please stay clear of the area."
           );
-          utterance.voice = window.speechSynthesis.getVoices().find(v => v.name.includes("Female") || v.lang.includes("en-US")) || null;
+          utterance.voice =
+            window.speechSynthesis.getVoices().find(
+              (v) => v.name.includes("Female") || v.lang.includes("en-US")
+            ) || null;
           utterance.rate = 0.95;
           utterance.pitch = 1.0;
           window.speechSynthesis.speak(utterance);
-          setCallStatus("connected");
         }
-      }, 800); // Start speaking shortly after opening
-    } else {
-      setTimeout(() => setCallStatus("connected"), 800);
-    }
+        setCallStatus("connected");
+      }
+    }, 800);
+    timeoutIds.push(speechTimeoutId);
 
-    // Process chat sequence
-    sequence.forEach((msg) => {
+    // Process chat sequence using the snapshot captured above
+    sequenceRef.current.forEach((msg) => {
       cumulativeDelay += msg.delayMs;
 
-      // Show typing indicator before message
+      // Show typing indicator before each message
       const typingTimeout = setTimeout(() => {
         setIsTyping(true);
       }, cumulativeDelay - 800);
@@ -125,12 +139,9 @@ export default function EmergencyDispatchModal({ isOpen, onClose, poolLocation, 
 
     return () => {
       timeoutIds.forEach(clearTimeout);
-      if ("speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, sequence]);
+  }, [isOpen]);
 
   // Auto-scroll to bottom of chat
   useEffect(() => {
@@ -249,15 +260,15 @@ export default function EmergencyDispatchModal({ isOpen, onClose, poolLocation, 
         {messages.map((msg) => (
           <div key={msg.id} className={`flex w-full ${msg.sender === "system" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[85%] rounded-2xl p-3 ${msg.sender === "system"
-                ? "bg-blue-600/20 border border-blue-500/30 text-blue-50 rounded-tr-sm"
-                : "bg-slate-800 border border-slate-700 text-slate-200 rounded-tl-sm"
+              ? "bg-blue-600/20 border border-blue-500/30 text-blue-50 rounded-tr-sm"
+              : "bg-slate-800 border border-slate-700 text-slate-200 rounded-tl-sm"
               }`}>
               <div className="flex items-center gap-2 mb-1.5 opacity-70">
                 {msg.sender === "system" ? (
                   <span className="text-[9px] font-bold uppercase tracking-widest text-blue-400">SwimSecure System</span>
                 ) : (
                   <span className="text-[9px] font-bold uppercase tracking-widest text-red-400 flex items-center gap-1">
-                    <ShieldAlert className="w-2.5 h-2.5" /> 911 Dispatch
+                    <ShieldAlert className="w-2.5 h-2.5" />999 Dispatch
                   </span>
                 )}
                 <span className="text-[9px] ml-auto"><Clock className="w-2.5 h-2.5 inline mr-1" />{new Date().toLocaleTimeString()}</span>

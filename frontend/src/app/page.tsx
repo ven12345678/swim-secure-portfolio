@@ -358,7 +358,13 @@ export default function Home() {
           <div className="absolute top-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2">
             <button
               id="stop-btn"
-              onClick={() => setIsActive(false)}
+              onClick={() => {
+                setIsActive(false);
+                setTotalPersons(0);
+                setCurrentMaxRisk(0);
+                setIsIncidentActive(false);
+                lastIncidentStateRef.current = false;
+              }}
               className="flex items-center gap-2.5 px-7 py-2.5 rounded-full font-bold text-sm transition-all shadow-xl border bg-red-600 border-red-500 text-white hover:bg-red-500 active:scale-95"
             >
               <Square className="w-4 h-4 fill-current" /> Stop
@@ -424,7 +430,7 @@ export default function Home() {
               </div>
               <div>
                 <p className="text-neutral-900 text-lg font-medium">Select a camera source to begin live detection</p>
-                <p className="text-neutral-700 text-md mt-1">Dashboard supports local webcam, remote phones, or CCTV</p>
+                <p className="text-neutral-700 text-md mt-1">For offline analysis of recorded videos, scroll down to the Video File Analysis section.</p>
               </div>
 
               {/* ── System Overview Strip ── */}
@@ -554,11 +560,11 @@ export default function Home() {
       </section>
 
       {/* Alert overlay */}
-      <AlertSystem 
-        isIncidentActive={isIncidentActive} 
-        isActive={isActive} 
-        poolLocation={poolLocation} 
-        affectedSwimmers={peakPersonsRef.current} 
+      <AlertSystem
+        isIncidentActive={isIncidentActive}
+        isActive={isActive}
+        poolLocation={poolLocation}
+        affectedSwimmers={peakPersonsRef.current}
       />
 
       <LocationSelector
