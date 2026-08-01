@@ -33,7 +33,7 @@ class DrowningLSTM(nn.Module):
 
 # ── Load models ───────────────────────────────────────────────────────────────
 try:
-    yolo_model = YOLO('models/yolo_best_v3.pt')
+    yolo_model = YOLO('models/yolo_best.pt')
     print("✅ YOLO model loaded")
 except Exception as e:
     yolo_model = None
@@ -42,7 +42,7 @@ except Exception as e:
 try:
     lstm_model = DrowningLSTM(input_size=11).to(device)
     lstm_model.load_state_dict(
-        torch.load('models/lstm_best_v8_nightft.pt', map_location=device)
+        torch.load('models/lstm_best_final.pt', map_location=device)
     )
     lstm_model.eval()
     print("✅ LSTM model loaded")

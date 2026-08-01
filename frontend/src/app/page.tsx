@@ -78,6 +78,7 @@ export default function Home() {
   // ── analytics state ─────────────────────────────────────────────────────────
   const [totalPersons, setTotalPersons] = useState(0);
   const [currentMaxRisk, setCurrentMaxRisk] = useState(0);
+  const [sessionPeakRisk, setSessionPeakRisk] = useState(0);
   const [isIncidentActive, setIsIncidentActive] = useState(false);
   const [incidentLog, setIncidentLog] = useState<Incident[]>([]);
   const [riskLog, setRiskLog] = useState<RiskEntry[]>([]);
@@ -136,6 +137,7 @@ export default function Home() {
     let maxRisk = 0;
     data.detections.forEach((d) => { if (d.drowning_risk > maxRisk) maxRisk = d.drowning_risk; });
     setCurrentMaxRisk(maxRisk);
+    setSessionPeakRisk((prev) => Math.max(prev, maxRisk));
 
     // Risk log (keep last 60 entries)
     setRiskLog((prev) => {
@@ -363,6 +365,7 @@ export default function Home() {
                 setTotalPersons(0);
                 setCurrentMaxRisk(0);
                 setIsIncidentActive(false);
+                setShowRiskLog(false);
                 lastIncidentStateRef.current = false;
               }}
               className="flex items-center gap-2.5 px-7 py-2.5 rounded-full font-bold text-sm transition-all shadow-xl border bg-red-600 border-red-500 text-white hover:bg-red-500 active:scale-95"
@@ -416,13 +419,13 @@ export default function Home() {
               <div className="flex gap-4">
                 <button
                   id="start-btn"
-                  onClick={() => { setPendingVideoSource('camera'); setShowLocationSelector(true); }}
+                  onClick={() => { setSessionPeakRisk(0); setShowRiskLog(true); setPendingVideoSource('camera'); setShowLocationSelector(true); }}
                   className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all duration-300 shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-[black] bg-[black] text-slate-200 hover:bg-white hover:border-white hover:text-black hover:scale-105 active:scale-95"
                 >
                   <Play className="w-6 h-6 fill-current" /> Local Camera
                 </button>
                 <button
-                  onClick={() => setShowQRModal(true)}
+                  onClick={() => { setSessionPeakRisk(0); setShowQRModal(true); }}
                   className="flex items-center gap-2.5 px-8 py-3.5 rounded-full font-bold text-base transition-all duration-300 shadow-[0_0_30px_rgba(0,0,0,0.5)] border border-[black] bg-[black] text-slate-200 hover:bg-white hover:border-white hover:text-black hover:scale-105 active:scale-95"
                 >
                   <Smartphone className="w-6 h-6" /> Remote Camera
@@ -616,7 +619,7 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 ">
             {[
               { label: 'Incidents Detected', value: incidentLog.length, color: 'border-blue-200 bg-blue-50' },
-              { label: 'Peak Risk', value: `${Math.round(currentMaxRisk)}%`, color: 'border-blue-200 bg-blue-50' },
+              { label: 'Peak Risk', value: `${Math.round(sessionPeakRisk)}%`, color: 'border-blue-200 bg-blue-50' },
               { label: 'Last Incident', value: incidentLog[0]?.time ?? '—', color: 'border-blue-200 bg-blue-50' },
             ].map((s, i) => (
               <div key={i} className={`p-5 rounded-2xl border ${s.color} flex flex-col gap-3`}>
@@ -762,7 +765,7 @@ export default function Home() {
                 {/* Activate analysis button */}
                 <div className="flex gap-3">
                   <button
-                    onClick={() => { setPendingVideoSource('upload'); setShowLocationSelector(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                    onClick={() => { setSessionPeakRisk(0); setShowRiskLog(true); setPendingVideoSource('upload'); setShowLocationSelector(true); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                     className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl text-sm transition-all shadow-md"
                   >
                     <Camera className="w-4 h-4" /> Analyze in Full Screen
