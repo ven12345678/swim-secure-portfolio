@@ -249,7 +249,7 @@ export default function HistoryPage() {
           {['all', 'high_risk', 'confirmed', 'false_alarm'].map(f => (
             <button
               key={f}
-              onClick={() => setFilter(f as any)}
+              onClick={() => setFilter(f as 'all' | 'high_risk' | 'confirmed' | 'false_alarm')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
                 filter === f 
                   ? 'bg-slate-800 text-white shadow-sm' 

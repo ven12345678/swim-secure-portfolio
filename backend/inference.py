@@ -174,9 +174,8 @@ def get_lstm_drowning_risk(track_history: list, person_id: int) -> float:
     else:
         buf.append(None)
 
-   # Need at least 10 frames before predicting
+    # Need at least 10 frames before predicting
     if len(buf) < 10:
-        print(f"Person {person_id}: buffer {len(buf)}/30, need at least 10")
         return 0.0
 
     # Pad shorter buffer to 30 by repeating first frame
@@ -193,7 +192,6 @@ def get_lstm_drowning_risk(track_history: list, person_id: int) -> float:
         with torch.no_grad():
             prob = torch.sigmoid(lstm_model(x_tensor)).item()
 
-        print(f"Person {person_id}: LSTM prob={prob:.3f} ({prob*100:.1f}%)")
         return round(prob * 100, 1)
 
     except Exception as e:

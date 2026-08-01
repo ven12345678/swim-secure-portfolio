@@ -8,7 +8,8 @@ import sys
 # Import our existing logic
 # Assuming this script is run from the backend directory
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from inference import client as roboflow_client
+# NOTE: This script is deprecated and broken. It relies on a removed `client` from inference.py.
+# from inference import client as roboflow_client
 from tracker import PersonTracker
 
 def encode_frame_to_base64(frame):

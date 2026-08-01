@@ -156,11 +156,9 @@ export default function Home() {
         incidentStartRef.current = Date.now();
         peakIncidentRiskRef.current = maxRisk;
         peakPersonsRef.current = data.total_persons;
-        console.log("[Incident Start] Max Risk:", maxRisk);
       } else {
         peakIncidentRiskRef.current = Math.max(peakIncidentRiskRef.current, maxRisk);
         peakPersonsRef.current = Math.max(peakPersonsRef.current, data.total_persons);
-        console.log("[Incident Active] Current Max Risk:", maxRisk, "Peak:", peakIncidentRiskRef.current);
       }
     }
     if (!nowActive && lastIncidentStateRef.current && incidentStartRef.current !== null) {
@@ -169,7 +167,6 @@ export default function Home() {
 
       const loggedPeakRisk = Math.round(peakIncidentRiskRef.current);
       const loggedPeakPersons = peakPersonsRef.current;
-      console.log("[Incident End] Logged Peak Risk:", loggedPeakRisk, "Persons:", loggedPeakPersons);
 
       setIncidentLog((prev) => [
         {
