@@ -18,7 +18,7 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
   const wsRef = useRef<WebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [remoteFrame, setRemoteFrame] = useState<string | null>(null);
-  
+
   const isActiveRef = useRef(isActive);
   useEffect(() => {
     isActiveRef.current = isActive;
@@ -30,10 +30,10 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
     let reconnectTimeout: NodeJS.Timeout;
 
     const connect = () => {
-      const host = window.location.hostname;
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const role = videoSource === 'remote' ? 'viewer' : 'local';
-      const ws = new WebSocket(`${protocol}//${host}:8000/ws/stream?role=${role}`);
+      const ws = new WebSocket(
+        `wss://swim-secure-backend.onrender.com/ws/stream?role=${role}`
+      );
 
       ws.onopen = () => {
         if (!isMounted) { ws.close(); return; }

@@ -15,10 +15,8 @@ export default function CameraStreamer() {
     let ws: WebSocket;
     const connect = () => {
       // Build dynamic WebSocket URL based on host
-      const host = window.location.hostname;
-      // Assume backend is on port 8000 on the same host
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${host}:8000/ws/stream?role=streamer`;
+      const wsUrl =
+        'wss://swim-secure-backend.onrender.com/ws/stream?role=streamer';
 
       ws = new WebSocket(wsUrl);
 
@@ -94,7 +92,7 @@ export default function CameraStreamer() {
             videoConstraints={{ facingMode: 'environment' }}
             onUserMediaError={(err) => setError("Camera access denied or unavailable. " + (typeof err === 'string' ? err : (err.message || '')))}
           />
-          
+
           {/* Overlay Status */}
           {isStreaming && (
             <div className="absolute top-4 right-4 flex items-center gap-2 bg-red-600 px-3 py-1.5 rounded-full shadow-lg">
@@ -107,13 +105,12 @@ export default function CameraStreamer() {
         <button
           onClick={() => setIsStreaming(!isStreaming)}
           disabled={!isConnected}
-          className={`w-full max-w-sm py-4 rounded-2xl font-bold text-lg tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 ${
-            !isConnected 
+          className={`w-full max-w-sm py-4 rounded-2xl font-bold text-lg tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 ${!isConnected
               ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-              : isStreaming 
-                ? 'bg-red-600 text-white shadow-[0_0_30px_rgba(220,38,38,0.4)]' 
+              : isStreaming
+                ? 'bg-red-600 text-white shadow-[0_0_30px_rgba(220,38,38,0.4)]'
                 : 'bg-blue-600 text-white shadow-[0_0_30px_rgba(37,99,235,0.4)]'
-          }`}
+            }`}
         >
           {isStreaming ? (
             <>Stop Streaming</>

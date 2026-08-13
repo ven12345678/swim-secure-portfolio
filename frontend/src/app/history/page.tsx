@@ -71,10 +71,7 @@ const formatDate = (iso: string) =>
     timeStyle: "short",
   });
 
-const API_BASE =
-  typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:8000`
-    : "https://localhost:8000";
+const API_BASE = 'https://swim-secure-backend.onrender.com';
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function HistoryPage() {
@@ -157,11 +154,11 @@ export default function HistoryPage() {
   const filteredSessions = sessions.filter(s => {
     if (filter === 'all') return true;
     if (filter === 'high_risk') return s.peak_risk >= 70 || s.total_incidents > 0;
-    
+
     const sessionFeedbacks = allFeedbacks.filter(fb => fb.session_id === s.id);
     if (filter === 'confirmed') return sessionFeedbacks.some(fb => fb.verdict === 'confirmed');
     if (filter === 'false_alarm') return sessionFeedbacks.some(fb => fb.verdict === 'false_alarm');
-    
+
     return true;
   });
 
@@ -250,11 +247,10 @@ export default function HistoryPage() {
             <button
               key={f}
               onClick={() => setFilter(f as 'all' | 'high_risk' | 'confirmed' | 'false_alarm')}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                filter === f 
-                  ? 'bg-slate-800 text-white shadow-sm' 
+              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${filter === f
+                  ? 'bg-slate-800 text-white shadow-sm'
                   : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200 shadow-sm'
-              }`}
+                }`}
             >
               {f === 'all' && 'All'}
               {f === 'high_risk' && 'High Risk'}
@@ -495,8 +491,8 @@ export default function HistoryPage() {
                         <div
                           key={fb.id}
                           className={`flex items-center justify-between p-3 rounded-xl border text-xs ${fb.verdict === "confirmed"
-                              ? "bg-red-50/50 border-red-200"
-                              : "bg-slate-50 border-slate-200 opacity-80"
+                            ? "bg-red-50/50 border-red-200"
+                            : "bg-slate-50 border-slate-200 opacity-80"
                             }`}
                         >
                           <div className="flex items-center gap-2">
@@ -511,8 +507,8 @@ export default function HistoryPage() {
                             <span className="text-slate-500">Risk: {Math.round(fb.max_risk_at_time)}%</span>
                             <span
                               className={`px-2 py-0.5 rounded-full font-bold text-[9px] uppercase border ${fb.verdict === "confirmed"
-                                  ? "bg-red-100 text-red-700 border-red-200"
-                                  : "bg-slate-100 text-slate-600 border-slate-200"
+                                ? "bg-red-100 text-red-700 border-red-200"
+                                : "bg-slate-100 text-slate-600 border-slate-200"
                                 }`}
                             >
                               {fb.verdict === "confirmed" ? "Confirmed" : "False Alarm"}

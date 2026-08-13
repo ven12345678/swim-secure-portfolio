@@ -67,6 +67,8 @@ const riskColorLight = (r: number) =>
 const riskBg = (r: number) =>
   r >= 70 ? 'bg-red-500/20 border-red-500/40' : r >= 40 ? 'bg-orange-500/20 border-orange-500/40' : 'bg-green-500/20 border-green-500/40';
 
+const API_BASE = 'https://swim-secure-backend.onrender.com';
+
 export default function Home() {
   // ── playback state ──────────────────────────────────────────────────────────
   const [isActive, setIsActive] = useState(false);
@@ -106,17 +108,10 @@ export default function Home() {
 
   useEffect(() => {
     setIsMounted(true);
-    const protocol = window.location.protocol; // 'https:' or 'http:'
-    fetch(`${protocol}//localhost:8000/local-ip`)
-      .then(r => r.json())
-      .then(data => {
-        setRemoteUrl(`${protocol}//${data.ip}:3000/camera`);
-      })
-      .catch(() => {
-        setRemoteUrl(`${window.location.origin}/camera`);
-      });
+    setRemoteUrl(`${window.location.origin}/camera`);
+
     // Fetch the current backend config and sync slider
-    fetch(`${window.location.protocol}//localhost:8000/config`)
+    fetch(`${API_BASE}/config`)
       .then(r => r.json())
       .then(cfg => {
         if (cfg.alert_threshold) setAlertThreshold(Math.round(cfg.alert_threshold * 100));
@@ -394,7 +389,7 @@ export default function Home() {
               }}
               onMouseUp={(e) => {
                 const val = Number((e.target as HTMLInputElement).value);
-                fetch(`${window.location.protocol}//localhost:8000/config`, {
+                fetch(`${API_BASE}/config`, {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ alert_threshold: val / 100 }),
@@ -671,7 +666,7 @@ export default function Home() {
                         <button
                           onClick={() => {
                             setIncidentLog(prev => prev.map(i => i.id === inc.id ? { ...i, feedback: 'confirmed' } : i));
-                            fetch(`${window.location.protocol}//localhost:8000/feedback`, {
+                            fetch(`${API_BASE}/feedback`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
@@ -689,7 +684,7 @@ export default function Home() {
                         <button
                           onClick={() => {
                             setIncidentLog(prev => prev.map(i => i.id === inc.id ? { ...i, feedback: 'false_alarm' } : i));
-                            fetch(`${window.location.protocol}//localhost:8000/feedback`, {
+                            fetch(`${API_BASE}/feedback`, {
                               method: 'POST',
                               headers: { 'Content-Type': 'application/json' },
                               body: JSON.stringify({
