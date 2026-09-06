@@ -67,7 +67,9 @@ const riskColorLight = (r: number) =>
 const riskBg = (r: number) =>
   r >= 70 ? 'bg-red-500/20 border-red-500/40' : r >= 40 ? 'bg-orange-500/20 border-orange-500/40' : 'bg-green-500/20 border-green-500/40';
 
-const API_BASE = 'https://swim-secure-backend.onrender.com';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  'https://swim-secure-backend.onrender.com';
 
 export default function Home() {
   // ── playback state ──────────────────────────────────────────────────────────

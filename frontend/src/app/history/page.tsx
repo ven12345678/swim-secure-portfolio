@@ -71,7 +71,9 @@ const formatDate = (iso: string) =>
     timeStyle: "short",
   });
 
-const API_BASE = 'https://swim-secure-backend.onrender.com';
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  'https://swim-secure-backend.onrender.com';
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function HistoryPage() {
@@ -248,8 +250,8 @@ export default function HistoryPage() {
               key={f}
               onClick={() => setFilter(f as 'all' | 'high_risk' | 'confirmed' | 'false_alarm')}
               className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-colors ${filter === f
-                  ? 'bg-slate-800 text-white shadow-sm'
-                  : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200 shadow-sm'
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'bg-white text-slate-500 hover:bg-slate-50 border border-slate-200 shadow-sm'
                 }`}
             >
               {f === 'all' && 'All'}

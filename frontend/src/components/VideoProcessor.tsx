@@ -31,8 +31,14 @@ export default function VideoProcessor({ onDataReceived, isActive, videoSource, 
 
     const connect = () => {
       const role = videoSource === 'remote' ? 'viewer' : 'local';
+      const apiBase =
+        process.env.NEXT_PUBLIC_API_BASE_URL ||
+        'https://swim-secure-backend.onrender.com';
+
+      const wsBase = apiBase.replace(/^http/, 'ws');
+
       const ws = new WebSocket(
-        `wss://swim-secure-backend.onrender.com/ws/stream?role=${role}`
+        `${wsBase}/ws/stream?role=${role}`
       );
 
       ws.onopen = () => {
