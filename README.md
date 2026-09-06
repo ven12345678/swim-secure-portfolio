@@ -43,14 +43,12 @@ A real-time AI-powered drowning detection system that processes video streams, d
 
 ## System Architecture
 
-![alt text](image.png)
-
+![alt text](docs/images/system-architecture.png)
 ---
 
 ## AI/ML Pipeline
 
-![alt text](image-2.png)
-
+![alt text](docs/images/ai-ml-pipeline.png)
 ---
 
 ## Model Performance
@@ -80,7 +78,7 @@ A real-time AI-powered drowning detection system that processes video streams, d
 | Recall | 1.000 |
 | F1 Score | 0.889 |
 | Accuracy | 0.857 |
-| Total pipeline latency | 28.13 ms |
+| Inference pipeline latency | 28.13 ms |
 
 ---
 
@@ -156,7 +154,6 @@ mkcert -cert-file certs/cert.pem -key-file certs/key.pem localhost 127.0.0.1 ::1
 ### 4. Start the Backend
 
 ```bash
-cd backend
 source venv/bin/activate
 
 # Run with local HTTPS
@@ -169,7 +166,7 @@ python main.py
 ### 5. Frontend
 
 ```bash
-cd frontend
+cd ../frontend
 npm install
 
 # Run with local HTTPS (uses certs from ../certs/)
@@ -182,16 +179,16 @@ npm run dev
 ## Screenshots
 
 YOLO bounding boxes across 4 lighting conditions
-![alt text](image-3.png)
+![alt text](docs/images/yolo-detection.png)
 
 Remote Camera Connection Interface Using QR Code for Mobile Camera Streaming
-![alt text](image-4.png)
+![alt text](docs/images/remote-camera.png)
 
 Session Risk Trend + Incident History
-![alt text](image-5.png)
+![alt text](docs/images/session-history.png)
 
 Alert + Operator Feedback / Emergency Dispatch
-![alt text](image-6.png)
+![alt text](docs/images/alert-dispatch.png)
 
 ---
 
